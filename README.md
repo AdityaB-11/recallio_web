@@ -32,7 +32,7 @@ A smart task management, expense tracking, and calorie counting web application 
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/AdityaB-11/recallio.git
+git clone https://github.com/AdityaB-11/recallio_web.git
 cd recallio
 ```
 
@@ -45,10 +45,10 @@ npm install
 3. Configure environment variables:
 
 ```bash
-cp .env.local.sample .env.local
+cp .env
 ```
 
-Edit `.env.local` and add your Firebase and Gemini API credentials.
+Edit `.env` and add your Firebase and Gemini API credentials.
 
 4. Run the development server:
 
