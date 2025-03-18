@@ -33,7 +33,7 @@ A smart task management, expense tracking, and calorie counting web application 
 
 ```bash
 git clone https://github.com/AdityaB-11/recallio_web.git
-cd recallio
+cd recallio_web
 ```
 
 2. Install dependencies:
@@ -63,12 +63,12 @@ npm run dev
 1. Create a new Firebase project at [https://console.firebase.google.com/](https://console.firebase.google.com/)
 2. Enable Authentication with Email/Password sign-in method
 3. Create a Firestore database
-4. Add your Firebase configuration to the `.env.local` file
+4. Add your Firebase configuration to the `.env` file
 
 ## Gemini API Setup
 
 1. Get your API key from [Google AI Studio](https://makersuite.google.com/)
-2. Add your Gemini API key to the `.env.local` file
+2. Add your Gemini API key to the `.env` file
 
 ## License
 
