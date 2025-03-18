@@ -32,7 +32,7 @@ A smart task management, expense tracking, and calorie counting web application 
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/recallio.git
+git clone https://github.com/AdityaB-11/recallio.git
 cd recallio
 ```
 
