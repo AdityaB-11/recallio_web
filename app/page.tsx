@@ -4,16 +4,20 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Navbar from './components/Navbar';
 import NoteEditor from './components/NoteEditor';
+import PremiumPromo from './components/PremiumPromo';
 import { useAuth } from './context/AuthContext';
 import { 
   ClipboardDocumentListIcon, 
   CurrencyDollarIcon, 
   FireIcon,
-  SparklesIcon
+  SparklesIcon,
+  LockClosedIcon
 } from '@heroicons/react/24/outline';
+import Card, { CardContent } from './components/ui/Card';
+import Badge from './components/ui/Badge';
 
 export default function Home() {
-  const { user } = useAuth();
+  const { user, isPremium } = useAuth();
   const [mounted, setMounted] = useState(false);
   
   useEffect(() => {
@@ -56,20 +60,38 @@ export default function Home() {
           
           {mounted && user ? (
             <>
-              <div className="mb-16 animate-fadeIn" style={{ animationDelay: '0.4s' }}>
-                <NoteEditor />
-              </div>
+              {isPremium ? (
+                <div className="mb-16 animate-fadeIn" style={{ animationDelay: '0.4s' }}>
+                  <NoteEditor />
+                </div>
+              ) : (
+                <div className="mb-16 animate-fadeIn" style={{ animationDelay: '0.4s' }}>
+                  <PremiumPromo />
+                </div>
+              )}
               
-              <h2 className="text-2xl md:text-3xl font-bold text-white mb-8 font-heading animate-fadeIn" style={{ animationDelay: '0.6s' }}>
+              <h2 className="text-2xl md:text-3xl font-bold text-white mb-4 font-heading animate-fadeIn" style={{ animationDelay: '0.6s' }}>
                 Quick Access
+                {isPremium && (
+                  <Badge variant="primary" className="ml-3">
+                    Premium
+                  </Badge>
+                )}
               </h2>
               
               <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
                 <Link
                   href="/tasks"
-                  className="block card-gradient p-6 rounded-xl shadow-xl hover-lift border border-slate-700/50 animate-fadeIn"
+                  className="block card-gradient p-6 rounded-xl shadow-xl hover-lift border border-slate-700/50 animate-fadeIn relative"
                   style={{ animationDelay: '0.7s' }}
                 >
+                  {!isPremium && (
+                    <div className="absolute top-4 right-4">
+                      <div className="bg-slate-800/80 p-2 rounded-full">
+                        <LockClosedIcon className="h-5 w-5 text-indigo-400" />
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center">
                     <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 p-3 rounded-lg shadow-md transform transition-transform group-hover:scale-105">
                       <ClipboardDocumentListIcon className="h-7 w-7 text-white" aria-hidden="true" />
@@ -85,9 +107,16 @@ export default function Home() {
                 
                 <Link
                   href="/expenses"
-                  className="block card-gradient p-6 rounded-xl shadow-xl hover-lift border border-slate-700/50 animate-fadeIn"
+                  className="block card-gradient p-6 rounded-xl shadow-xl hover-lift border border-slate-700/50 animate-fadeIn relative"
                   style={{ animationDelay: '0.8s' }}
                 >
+                  {!isPremium && (
+                    <div className="absolute top-4 right-4">
+                      <div className="bg-slate-800/80 p-2 rounded-full">
+                        <LockClosedIcon className="h-5 w-5 text-indigo-400" />
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center">
                     <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 p-3 rounded-lg shadow-md">
                       <CurrencyDollarIcon className="h-7 w-7 text-white" aria-hidden="true" />
@@ -103,9 +132,16 @@ export default function Home() {
                 
                 <Link
                   href="/calories"
-                  className="block card-gradient p-6 rounded-xl shadow-xl hover-lift border border-slate-700/50 animate-fadeIn"
+                  className="block card-gradient p-6 rounded-xl shadow-xl hover-lift border border-slate-700/50 animate-fadeIn relative"
                   style={{ animationDelay: '0.9s' }}
                 >
+                  {!isPremium && (
+                    <div className="absolute top-4 right-4">
+                      <div className="bg-slate-800/80 p-2 rounded-full">
+                        <LockClosedIcon className="h-5 w-5 text-indigo-400" />
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center">
                     <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 p-3 rounded-lg shadow-md">
                       <FireIcon className="h-7 w-7 text-white" aria-hidden="true" />
@@ -119,6 +155,12 @@ export default function Home() {
                   </div>
                 </Link>
               </div>
+              
+              {!isPremium && (
+                <div className="mt-12 animate-fadeIn" style={{ animationDelay: '1s' }}>
+                  <PremiumPromo compact={true} className="mb-4" />
+                </div>
+              )}
             </>
           ) : (
             <div className="card-gradient p-8 rounded-2xl shadow-2xl text-center border border-slate-700/50 max-w-2xl mx-auto animate-fadeIn" style={{ animationDelay: '0.5s' }}>

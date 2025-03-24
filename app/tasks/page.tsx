@@ -2,6 +2,7 @@
 
 import Navbar from '../components/Navbar';
 import TaskManager from '../components/TaskManager';
+import PremiumGuard from '../components/PremiumGuard';
 import { ClipboardDocumentListIcon } from '@heroicons/react/24/outline';
 import { CardHeader } from '../components/ui/Card';
 
@@ -19,7 +20,9 @@ export default function TasksPage() {
           </div>
           
           <div className="animate-fadeIn" style={{ animationDelay: '0.2s' }}>
-            <TaskManager />
+            <PremiumGuard>
+              <TaskManager />
+            </PremiumGuard>
           </div>
         </div>
       </main>

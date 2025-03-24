@@ -2,16 +2,18 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { useAuth } from '../context/AuthContext';
+import Link from 'next/link';
+import Button from '../components/ui/Button';
+import Navbar from '../components/Navbar';
 
 export default function Login() {
-  const { login } = useAuth();
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { login, isOnline } = useAuth();
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,22 +22,34 @@ export default function Login() {
       setError('Please enter both email and password');
       return;
     }
+
+    if (!isOnline) {
+      setError('You are currently offline. Please check your internet connection and try again.');
+      return;
+    }
+    
+    setError('');
+    setLoading(true);
     
     try {
-      setError(null);
-      setLoading(true);
-      
       await login(email, password);
       router.push('/');
     } catch (err: any) {
       console.error('Login error:', err);
       
+      // Handle specific error messages
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
         setError('Invalid email or password');
       } else if (err.code === 'auth/too-many-requests') {
-        setError('Too many unsuccessful login attempts. Please try again later.');
+        setError('Too many failed login attempts. Please try again later or reset your password');
+      } else if (err.code === 'auth/api-key-not-valid') {
+        setError('Firebase configuration error. The application is not properly configured.');
+      } else if (err.message?.includes('Firebase configuration error')) {
+        setError(err.message);
+      } else if (err.message) {
+        setError(err.message);
       } else {
-        setError('An error occurred while signing in. Please try again.');
+        setError('Failed to log in. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -43,75 +57,88 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-slate-900">
-      <div className="w-full max-w-md">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-indigo-400">Recallio</h1>
-          <h2 className="mt-6 text-2xl font-bold tracking-tight text-white">
-            Sign in to your account
-          </h2>
-          <p className="mt-2 text-sm text-gray-400">
-            Or{' '}
-            <Link href="/signup" className="font-medium text-indigo-400 hover:text-indigo-300">
-              create a new account
-            </Link>
-          </p>
-        </div>
-        
-        <div className="mt-8 bg-slate-800 py-8 px-4 shadow rounded-lg sm:px-10 border border-slate-700">
-          {error && (
-            <div className="mb-4 bg-red-900/30 p-4 rounded-md border border-red-800">
-              <div className="text-sm text-red-300">{error}</div>
-            </div>
-          )}
-          
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300">
-                Email address
-              </label>
-              <div className="mt-1">
+    <div className="min-h-screen bg-slate-900">
+      <Navbar />
+      
+      <div className="flex flex-col items-center justify-center px-6 py-8 mx-auto md:h-screen lg:py-0 pt-20">
+        <div className="w-full bg-slate-800 rounded-lg shadow md:mt-0 sm:max-w-md xl:p-0">
+          <div className="p-6 space-y-4 md:space-y-6 sm:p-8">
+            <h1 className="text-xl font-bold leading-tight tracking-tight text-indigo-400 md:text-2xl">
+              Sign in to your account
+            </h1>
+            
+            <p className="text-sm text-white">
+              Welcome back! Please enter your credentials to access your account.
+            </p>
+            
+            {error && (
+              <div className="p-3 bg-red-900/30 border border-red-800 rounded-lg text-red-300 text-sm">
+                {error}
+                {error.includes('Firebase configuration') && (
+                  <div className="mt-2 text-xs">
+                    <p className="font-medium">Possible solutions:</p>
+                    <ul className="list-disc pl-5 mt-1 space-y-1">
+                      <li>Contact the site administrator</li>
+                      <li>Check if the application has valid Firebase credentials</li>
+                      <li>Try refreshing the page</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <form className="space-y-4 md:space-y-6" onSubmit={handleSubmit}>
+              <div>
+                <label htmlFor="email" className="block mb-2 text-sm font-medium text-gray-300">
+                  Email
+                </label>
                 <input
-                  id="email"
-                  name="email"
                   type="email"
-                  autoComplete="email"
-                  required
-                  className="block w-full appearance-none rounded-md border border-slate-600 bg-slate-700 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm text-white"
+                  name="email"
+                  id="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  className="bg-slate-700 border border-slate-600 text-white sm:text-sm rounded-lg focus:ring-indigo-600 focus:border-indigo-600 block w-full p-2.5"
+                  placeholder="name@company.com"
+                  required
                 />
               </div>
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300">
-                Password
-              </label>
-              <div className="mt-1">
+              
+              <div>
+                <label htmlFor="password" className="block mb-2 text-sm font-medium text-gray-300">
+                  Password
+                </label>
                 <input
-                  id="password"
-                  name="password"
                   type="password"
-                  autoComplete="current-password"
-                  required
-                  className="block w-full appearance-none rounded-md border border-slate-600 bg-slate-700 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm text-white"
+                  name="password"
+                  id="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="bg-slate-700 border border-slate-600 text-white sm:text-sm rounded-lg focus:ring-indigo-600 focus:border-indigo-600 block w-full p-2.5"
+                  required
                 />
               </div>
-            </div>
-
-            <div>
-              <button
+              
+              <Button 
                 type="submit"
-                disabled={loading}
-                className="flex w-full justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 focus:ring-offset-slate-800"
+                variant="primary"
+                size="lg"
+                fullWidth
+                isLoading={loading}
+                disabled={loading || !isOnline}
               >
-                {loading ? 'Signing in...' : 'Sign in'}
-              </button>
-            </div>
-          </form>
+                Sign in
+              </Button>
+              
+              <p className="text-sm text-gray-400">
+                Don't have an account yet?{' '}
+                <Link href="/signup" className="font-medium text-indigo-400 hover:underline">
+                  Sign up
+                </Link>
+              </p>
+            </form>
+          </div>
         </div>
       </div>
     </div>

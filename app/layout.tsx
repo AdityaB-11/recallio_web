@@ -3,6 +3,9 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Playfair_Display, Montserrat } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "./context/AuthContext";
+import ErrorBoundary from "./components/ErrorBoundary";
+import OfflineIndicator from "./components/OfflineIndicator";
+import NetworkStatus from "./components/NetworkStatus";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -42,7 +45,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} ${montserrat.variable} antialiased`}
       >
         <AuthProvider>
-          {children}
+          <ErrorBoundary>
+            {children}
+            <OfflineIndicator />
+            <NetworkStatus />
+          </ErrorBoundary>
         </AuthProvider>
       </body>
     </html>

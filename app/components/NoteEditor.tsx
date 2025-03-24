@@ -1,15 +1,18 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 import { analyzeText } from '../services/gemini';
 import { addTask } from '../services/taskService';
 import { addExpense } from '../services/expenseService';
 import { addFoodEntry } from '../services/calorieService';
-import { SparklesIcon, PaperAirplaneIcon } from '@heroicons/react/24/outline';
+import { SparklesIcon, PaperAirplaneIcon, LockClosedIcon } from '@heroicons/react/24/outline';
+import Button from './ui/Button';
 
 export default function NoteEditor() {
-  const { user } = useAuth();
+  const { user, isPremium } = useAuth();
+  const router = useRouter();
   const [note, setNote] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
@@ -23,6 +26,11 @@ export default function NoteEditor() {
 
     if (!user) {
       setError('Please log in to analyze notes');
+      return;
+    }
+    
+    if (!isPremium) {
+      router.push('/premium?from=premium-required');
       return;
     }
 
@@ -105,33 +113,58 @@ export default function NoteEditor() {
       <div className="flex items-center mb-4">
         <SparklesIcon className="h-6 w-6 text-indigo-400 mr-3" />
         <h2 className="text-2xl font-bold text-white font-heading">Smart Note</h2>
+        {!isPremium && (
+          <div className="ml-auto">
+            <div className="flex items-center text-indigo-400 bg-slate-700/50 py-1 px-3 rounded-full text-sm">
+              <LockClosedIcon className="h-4 w-4 mr-1" />
+              <span>Premium Feature</span>
+            </div>
+          </div>
+        )}
       </div>
       
       <p className="text-gray-300 mb-6 font-light">
-        Type anything and Recallio's AI will automatically determine if it's a task, expense, or food entry.
+        {isPremium 
+          ? "Type anything and Recallio's AI will automatically determine if it's a task, expense, or food entry."
+          : "Upgrade to Premium to unlock AI-powered note analysis that automatically identifies tasks, expenses, and food entries."}
       </p>
       
       <div className="mb-4 relative">
         <textarea
           className="w-full p-4 bg-slate-900/70 border border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-white placeholder:text-gray-500 transition-all"
           rows={4}
-          placeholder="Example: 'Buy groceries tomorrow', 'Spent $24.99 on lunch today', or 'Had a chicken sandwich with 450 calories'"
+          placeholder={isPremium 
+            ? "Example: 'Buy groceries tomorrow', 'Spent $24.99 on lunch today', or 'Had a chicken sandwich with 450 calories'"
+            : "Upgrade to Premium to use this feature"}
           value={note}
           onChange={(e) => setNote(e.target.value)}
+          disabled={!isPremium}
         />
         
-        <button
-          className="absolute bottom-3 right-3 btn-primary p-2 rounded-full hover:scale-105 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:hover:scale-100"
-          onClick={handleAnalyze}
-          disabled={isAnalyzing || !note.trim()}
-          aria-label="Analyze and save"
-        >
-          {isAnalyzing ? (
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-200 border-t-transparent" />
-          ) : (
-            <PaperAirplaneIcon className="h-5 w-5 text-white" />
-          )}
-        </button>
+        {isPremium ? (
+          <button
+            className="absolute bottom-3 right-3 btn-primary p-2 rounded-full hover:scale-105 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:hover:scale-100"
+            onClick={handleAnalyze}
+            disabled={isAnalyzing || !note.trim()}
+            aria-label="Analyze and save"
+          >
+            {isAnalyzing ? (
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-200 border-t-transparent" />
+            ) : (
+              <PaperAirplaneIcon className="h-5 w-5 text-white" />
+            )}
+          </button>
+        ) : (
+          <div className="flex justify-center mt-6">
+            <Button
+              variant="primary"
+              onClick={() => router.push('/premium?from=premium-required')}
+              icon={<SparklesIcon className="h-5 w-5" />}
+            >
+              Upgrade to Premium
+            </Button>
+          </div>
+        )}
       </div>
       
       {error && (

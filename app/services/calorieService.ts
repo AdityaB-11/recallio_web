@@ -35,16 +35,41 @@ export interface FoodEntry {
 // Add a new food entry
 export async function addFoodEntry(entry: Omit<FoodEntry, 'id' | 'createdAt'>) {
   try {
+    console.log('addFoodEntry called with:', entry);
+    
+    if (!entry.userId) {
+      console.error('Missing userId in food entry');
+      throw new Error('userId is required for food entry');
+    }
+    
+    if (!entry.foodName) {
+      console.error('Missing foodName in food entry');
+      throw new Error('foodName is required for food entry');
+    }
+    
+    if (!entry.date || !(entry.date instanceof Date)) {
+      console.error('Invalid date in food entry:', entry.date);
+      throw new Error('Valid date is required for food entry');
+    }
+    
     const entryWithDates = {
       ...entry,
       createdAt: Timestamp.now(),
       date: Timestamp.fromDate(entry.date),
     };
     
+    console.log('Attempting to add to Firestore:', entryWithDates);
+    
     const docRef = await addDoc(collection(db, 'foodEntries'), entryWithDates);
+    console.log('Food entry added with ID:', docRef.id);
+    
     return { id: docRef.id, ...entry };
   } catch (error) {
     console.error('Error adding food entry:', error);
+    // Add more details to the error for debugging
+    if (error instanceof Error) {
+      throw new Error(`Failed to add food entry: ${error.message}`);
+    }
     throw error;
   }
 }

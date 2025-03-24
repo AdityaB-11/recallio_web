@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { FoodEntry, getUserFoodEntries, getDailyCalorieSummary, updateFoodEntry, deleteFoodEntry } from '../services/calorieService';
+import { FoodEntry, getUserFoodEntries, getDailyCalorieSummary, updateFoodEntry, deleteFoodEntry, addFoodEntry } from '../services/calorieService';
 import { format, addDays, subDays, startOfDay } from 'date-fns';
-import { TrashIcon, PencilIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/20/solid';
+import { TrashIcon, PencilIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon, ArrowPathIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Bar } from 'react-chartjs-2';
+import { generateNutritionInfo } from '../services/gemini';
 import { 
   Chart as ChartJS, 
   CategoryScale, 
@@ -35,6 +36,21 @@ export default function CalorieCounter() {
   const [error, setError] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<FoodEntry | null>(null);
   
+  // New food entry form state
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newFoodEntry, setNewFoodEntry] = useState({
+    foodName: '',
+    calories: '',
+    protein: '',
+    carbs: '',
+    fat: '',
+    servingSize: '',
+    mealType: 'lunch' as 'breakfast' | 'lunch' | 'dinner' | 'snack'
+  });
+  const [isGeneratingNutrition, setIsGeneratingNutrition] = useState(false);
+  const [isSavingEntry, setIsSavingEntry] = useState(false);
+  const [aiFailedCount, setAiFailedCount] = useState(0);
+  
   const loadFoodEntries = async () => {
     if (!user) return;
     
@@ -42,10 +58,14 @@ export default function CalorieCounter() {
       setLoading(true);
       setError(null);
       
+      console.log('Loading food entries for user:', user.uid, 'date:', selectedDate);
+      
       const userEntries = await getUserFoodEntries(user.uid);
+      console.log('Retrieved food entries:', userEntries.length);
       setFoodEntries(userEntries);
       
       const summary = await getDailyCalorieSummary(user.uid, selectedDate);
+      console.log('Generated daily summary:', summary);
       setDailySummary(summary);
     } catch (err) {
       console.error('Error loading food entries:', err);
@@ -99,6 +119,167 @@ export default function CalorieCounter() {
       const newDate = days > 0 ? addDays(currentDate, days) : subDays(currentDate, Math.abs(days));
       return startOfDay(newDate);
     });
+  };
+
+  // Function to check if we should try AI generation
+  const shouldTryAiGeneration = useCallback(() => {
+    // If AI has failed 3 times in a row, don't try it again
+    return aiFailedCount < 3;
+  }, [aiFailedCount]);
+
+  // Generate nutrition info using Gemini AI
+  const generateAndFillNutrition = async () => {
+    if (!newFoodEntry.foodName) {
+      setError('Please enter a food name to generate nutrition information');
+      return;
+    }
+    
+    if (!shouldTryAiGeneration()) {
+      setError('Automatic generation is currently unavailable. Please enter values manually.');
+      return;
+    }
+    
+    try {
+      setIsGeneratingNutrition(true);
+      setError(null);
+      
+      const nutritionInfo = await generateNutritionInfo(
+        newFoodEntry.foodName,
+        newFoodEntry.servingSize || undefined
+      );
+      
+      setNewFoodEntry({
+        ...newFoodEntry,
+        calories: nutritionInfo.calories.toString(),
+        protein: nutritionInfo.macros.protein.toString(),
+        carbs: nutritionInfo.macros.carbs.toString(),
+        fat: nutritionInfo.macros.fat.toString(),
+        servingSize: nutritionInfo.servingSize || newFoodEntry.servingSize
+      });
+      
+      // Reset AI fail counter on success
+      setAiFailedCount(0);
+    } catch (err) {
+      console.error('Error generating nutrition info:', err);
+      setError('Failed to generate nutrition information. Please enter manually.');
+      
+      // Increment AI fail counter
+      setAiFailedCount(prev => prev + 1);
+    } finally {
+      setIsGeneratingNutrition(false);
+    }
+  };
+  
+  // Handle adding a new food entry
+  const handleAddFoodEntry = async () => {
+    if (!user) return;
+    if (!newFoodEntry.foodName) {
+      setError('Please enter a food name');
+      return;
+    }
+    
+    try {
+      setIsSavingEntry(true);
+      setError(null);
+      
+      // Check if calories are specified, if not, generate them using Gemini
+      let caloriesValue = newFoodEntry.calories;
+      let proteinValue = newFoodEntry.protein;
+      let carbsValue = newFoodEntry.carbs;
+      let fatValue = newFoodEntry.fat;
+      let servingSizeValue = newFoodEntry.servingSize;
+      
+      if (!caloriesValue && shouldTryAiGeneration()) {
+        try {
+          setIsGeneratingNutrition(true);
+          const nutritionInfo = await generateNutritionInfo(
+            newFoodEntry.foodName,
+            newFoodEntry.servingSize || undefined
+          );
+          
+          caloriesValue = nutritionInfo.calories.toString();
+          proteinValue = nutritionInfo.macros.protein.toString();
+          carbsValue = nutritionInfo.macros.carbs.toString();
+          fatValue = nutritionInfo.macros.fat.toString();
+          servingSizeValue = nutritionInfo.servingSize || newFoodEntry.servingSize;
+          
+          // Reset AI fail counter on success
+          setAiFailedCount(0);
+        } catch (err) {
+          console.error('Error generating nutrition info:', err);
+          setError('Auto-generation failed. Please enter calories manually.');
+          setIsGeneratingNutrition(false);
+          setIsSavingEntry(false);
+          
+          // Increment AI fail counter
+          setAiFailedCount(prev => prev + 1);
+          return;
+        } finally {
+          setIsGeneratingNutrition(false);
+        }
+      } else if (!caloriesValue) {
+        setError('Please enter calories manually as auto-generation is currently unavailable.');
+        setIsSavingEntry(false);
+        return;
+      }
+      
+      const calories = parseInt(caloriesValue) || 0;
+      if (calories <= 0) {
+        setError('Please enter a valid calorie amount');
+        setIsSavingEntry(false);
+        return;
+      }
+      
+      // Prepare macros object from form values
+      const macros = {
+        protein: parseFloat(proteinValue) || 0,
+        carbs: parseFloat(carbsValue) || 0,
+        fat: parseFloat(fatValue) || 0
+      };
+      
+      console.log('Attempting to add food entry:', {
+        userId: user.uid,
+        foodName: newFoodEntry.foodName,
+        calories,
+        macros,
+        servingSize: servingSizeValue || undefined,
+        mealType: newFoodEntry.mealType,
+        date: selectedDate
+      });
+      
+      // Create the food entry
+      await addFoodEntry({
+        userId: user.uid,
+        foodName: newFoodEntry.foodName,
+        calories,
+        macros,
+        servingSize: servingSizeValue || undefined,
+        mealType: newFoodEntry.mealType,
+        date: selectedDate
+      });
+      
+      // Reset form and reload entries
+      setNewFoodEntry({
+        foodName: '',
+        calories: '',
+        protein: '',
+        carbs: '',
+        fat: '',
+        servingSize: '',
+        mealType: 'lunch'
+      });
+      setShowAddForm(false);
+      
+      // Reload entries
+      await loadFoodEntries();
+      
+    } catch (err) {
+      console.error('Error adding food entry:', err);
+      setError(`Failed to add food entry: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setIsGeneratingNutrition(false);
+      setIsSavingEntry(false);
+    }
   };
   
   // Prepare macro data for chart
@@ -187,6 +368,164 @@ export default function CalorieCounter() {
         <div className="p-3 bg-red-100 text-red-700 rounded-md">{error}</div>
       ) : (
         <div className="space-y-8">
+          {/* Add Food Entry Button */}
+          <div className="flex justify-end">
+            <button
+              className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 transition-colors"
+              onClick={() => setShowAddForm(!showAddForm)}
+              disabled={loading}
+            >
+              {showAddForm ? 'Cancel' : 'Add Food Entry'}
+              {!showAddForm && <PlusIcon className="h-5 w-5 ml-1" />}
+            </button>
+          </div>
+          
+          {/* Add Food Entry Form */}
+          {showAddForm && (
+            <div className="bg-gray-50 p-4 rounded-md border border-gray-200 mb-6">
+              <h3 className="font-medium text-lg mb-3">Add Food Entry</h3>
+              
+              {aiFailedCount >= 3 && (
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md text-yellow-800 flex items-start">
+                  <ExclamationCircleIcon className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium">Auto-generation temporarily unavailable</p>
+                    <p className="text-sm">Please enter nutrition information manually. We'll try again later.</p>
+                  </div>
+                </div>
+              )}
+              
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Food Name *</label>
+                    <input
+                      type="text"
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                      value={newFoodEntry.foodName}
+                      onChange={(e) => setNewFoodEntry({ ...newFoodEntry, foodName: e.target.value })}
+                      placeholder="e.g. Chicken Sandwich"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Serving Size</label>
+                    <input
+                      type="text"
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                      value={newFoodEntry.servingSize}
+                      onChange={(e) => setNewFoodEntry({ ...newFoodEntry, servingSize: e.target.value })}
+                      placeholder="e.g. 1 sandwich, 100g"
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Calories 
+                      <span className="text-gray-500 ml-1 font-normal">(or auto-generate)</span>
+                    </label>
+                    <div className="flex space-x-2">
+                      <input
+                        type="number"
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        value={newFoodEntry.calories}
+                        onChange={(e) => setNewFoodEntry({ ...newFoodEntry, calories: e.target.value })}
+                        placeholder="e.g. 450"
+                      />
+                      
+                      <button
+                        className="flex items-center px-3 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
+                        onClick={generateAndFillNutrition}
+                        disabled={isGeneratingNutrition || !newFoodEntry.foodName}
+                        title="Auto-generate nutrition info using AI"
+                      >
+                        {isGeneratingNutrition ? (
+                          <ArrowPathIcon className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <ArrowPathIcon className="h-5 w-5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Meal Type</label>
+                    <select
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                      value={newFoodEntry.mealType}
+                      onChange={(e) => setNewFoodEntry({ 
+                        ...newFoodEntry, 
+                        mealType: e.target.value as 'breakfast' | 'lunch' | 'dinner' | 'snack' 
+                      })}
+                    >
+                      <option value="breakfast">Breakfast</option>
+                      <option value="lunch">Lunch</option>
+                      <option value="dinner">Dinner</option>
+                      <option value="snack">Snack</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Protein (g)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                      value={newFoodEntry.protein}
+                      onChange={(e) => setNewFoodEntry({ ...newFoodEntry, protein: e.target.value })}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Carbs (g)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                      value={newFoodEntry.carbs}
+                      onChange={(e) => setNewFoodEntry({ ...newFoodEntry, carbs: e.target.value })}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Fat (g)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                      value={newFoodEntry.fat}
+                      onChange={(e) => setNewFoodEntry({ ...newFoodEntry, fat: e.target.value })}
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex justify-end">
+                  <button
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 transition-colors disabled:bg-gray-400 flex items-center"
+                    onClick={handleAddFoodEntry}
+                    disabled={!newFoodEntry.foodName || isGeneratingNutrition || isSavingEntry}
+                  >
+                    {isGeneratingNutrition ? (
+                      <>
+                        <ArrowPathIcon className="h-5 w-5 animate-spin inline mr-2" />
+                        Generating...
+                      </>
+                    ) : isSavingEntry ? (
+                      <>
+                        <ArrowPathIcon className="h-5 w-5 animate-spin inline mr-2" />
+                        Saving...
+                      </>
+                    ) : 'Add Entry'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Summary Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>

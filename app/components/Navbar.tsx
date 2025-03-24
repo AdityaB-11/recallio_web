@@ -4,11 +4,12 @@ import { Fragment, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Disclosure, Menu, Transition } from '@headlessui/react';
-import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Bars3Icon, XMarkIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext';
+import Badge from './ui/Badge';
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
+  const { user, logout, isPremium } = useAuth();
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   
@@ -28,10 +29,16 @@ export default function Navbar() {
   
   const navigation = [
     { name: 'Dashboard', href: '/' },
-    { name: 'Tasks', href: '/tasks' },
-    { name: 'Expenses', href: '/expenses' },
-    { name: 'Calories', href: '/calories' },
+    { name: 'Tasks', href: '/tasks', premium: true },
+    { name: 'Expenses', href: '/expenses', premium: true },
+    { name: 'Calories', href: '/calories', premium: true },
+    { name: 'Premium', href: '/premium', show: !isPremium },
   ];
+
+  // Filter navigation items based on premium status
+  const filteredNavigation = navigation.filter(item => 
+    item.show === undefined || item.show === true
+  );
 
   return (
     <Disclosure 
@@ -54,7 +61,7 @@ export default function Navbar() {
                   <span className="text-xl font-bold text-gradient transition-all">Recallio</span>
                 </Link>
                 <div className="hidden sm:ml-10 sm:flex sm:space-x-8">
-                  {navigation.map((item) => (
+                  {filteredNavigation.map((item) => (
                     <Link
                       key={item.name}
                       href={item.href}
@@ -67,6 +74,11 @@ export default function Navbar() {
                       {item.name}
                       {pathname === item.href && (
                         <span className="absolute -bottom-[1px] left-0 right-0 h-[2px] bg-gradient-to-r from-indigo-400 to-indigo-600 rounded-full" />
+                      )}
+                      {item.name === 'Premium' && (
+                        <div className="ml-1.5">
+                          <SparklesIcon className="h-4 w-4 text-indigo-400" />
+                        </div>
                       )}
                     </Link>
                   ))}
@@ -99,7 +111,29 @@ export default function Navbar() {
                         <div className="px-4 py-2 border-b border-slate-700">
                           <p className="text-xs text-gray-400">Signed in as</p>
                           <p className="text-sm text-gray-200 truncate">{user.email}</p>
+                          {isPremium && (
+                            <Badge variant="primary" className="mt-1" size="sm">
+                              Premium
+                            </Badge>
+                          )}
                         </div>
+                        
+                        {!isPremium && (
+                          <Menu.Item>
+                            {({ active }) => (
+                              <Link
+                                href="/premium"
+                                className={`${
+                                  active ? 'bg-slate-700' : ''
+                                } flex w-full px-4 py-2 text-left text-sm text-gray-200 transition-colors items-center`}
+                              >
+                                <SparklesIcon className="h-4 w-4 text-indigo-400 mr-2" />
+                                Upgrade to Premium
+                              </Link>
+                            )}
+                          </Menu.Item>
+                        )}
+                        
                         <Menu.Item>
                           {({ active }) => (
                             <button
@@ -148,18 +182,21 @@ export default function Navbar() {
 
           <Disclosure.Panel className="sm:hidden animate-fadeIn">
             <div className="space-y-1 pb-3 pt-2">
-              {navigation.map((item) => (
+              {filteredNavigation.map((item) => (
                 <Disclosure.Button
                   key={item.name}
                   as={Link}
                   href={item.href}
-                  className={`block py-2 pl-3 pr-4 text-base font-medium ${
+                  className={`flex items-center py-2 pl-3 pr-4 text-base font-medium ${
                     pathname === item.href
                       ? 'text-indigo-300 bg-slate-700/50 border-l-2 border-indigo-500'
                       : 'text-gray-300 hover:bg-slate-700/30 hover:text-gray-200 border-l-2 border-transparent'
                   } transition-all`}
                 >
                   {item.name}
+                  {item.name === 'Premium' && (
+                    <SparklesIcon className="h-4 w-4 text-indigo-400 ml-1.5" />
+                  )}
                 </Disclosure.Button>
               ))}
             </div>
@@ -176,6 +213,11 @@ export default function Navbar() {
                   <div className="ml-3">
                     <div className="text-base font-medium text-white">
                       {user.displayName || 'User'}
+                      {isPremium && (
+                        <Badge variant="primary" className="ml-2" size="sm">
+                          Premium
+                        </Badge>
+                      )}
                     </div>
                     {user.email && (
                       <div className="text-sm font-medium text-gray-400 truncate max-w-[200px]">{user.email}</div>
@@ -202,6 +244,16 @@ export default function Navbar() {
               )}
               {user && (
                 <div className="mt-3 space-y-1 px-2">
+                  {!isPremium && (
+                    <Disclosure.Button
+                      as={Link}
+                      href="/premium"
+                      className="flex items-center w-full rounded-md px-3 py-2 text-base font-medium text-gray-300 hover:bg-slate-700 hover:text-gray-200 text-left transition-colors"
+                    >
+                      <SparklesIcon className="h-4 w-4 text-indigo-400 mr-2" />
+                      Upgrade to Premium
+                    </Disclosure.Button>
+                  )}
                   <Disclosure.Button
                     as="button"
                     onClick={() => logout()}
